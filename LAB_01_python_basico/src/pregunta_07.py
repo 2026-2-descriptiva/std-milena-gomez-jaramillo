@@ -1,3 +1,5 @@
+import gzip
+
 def pregunta_07():
     """
     Para cada valor distinto de la segunda columna (`value`), construya la
@@ -10,5 +12,23 @@ def pregunta_07():
 
         [(0, ["C"]), (1, ["E", "B", "E"]), (2, ["A", "E"]), ...]
     """
+    grupos = {}
 
-    raise NotImplementedError
+    with gzip.open("C:\\Analitica_descriptiva\\std-milena-gomez-jaramillo\\LAB_01_python_basico\\data\\data.csv.gz", "rt", encoding="utf-8") as archivo:
+        for linea in archivo:
+            columnas = linea.strip().split("\t")
+
+            letra = columnas[0]
+            valor = int(columnas[1])
+
+            if valor in grupos:
+                grupos[valor].append(letra)
+            else:
+                grupos[valor] = [letra]
+
+    return sorted(grupos.items())
+
+
+if __name__ == "__main__":
+    print(pregunta_07())
+

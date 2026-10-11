@@ -1,3 +1,5 @@
+import gzip
+
 def pregunta_10():
     """
     Para cada registro del archivo, en el mismo orden en que aparecen,
@@ -11,4 +13,27 @@ def pregunta_10():
         [("E", 3, 5), ("A", 3, 4), ("B", 4, 4), ...]
     """
 
-    raise NotImplementedError
+    resultado = []
+
+    with gzip.open("C:\\Analitica_descriptiva\\std-milena-gomez-jaramillo\\LAB_01_python_basico\\data\\data.csv.gz", "rt", encoding="utf-8") as archivo:
+        for linea in archivo:
+            columnas = linea.strip().split("\t")
+
+            letra = columnas[0]
+
+            codigos = columnas[3].split(",")
+            metricas = columnas[4].split(",")
+
+            cantidad_codigos = len(codigos)
+            cantidad_metricas = len(metricas)
+
+            resultado.append(
+                (letra, cantidad_codigos, cantidad_metricas)
+            )
+
+    return resultado
+
+
+if __name__ == "__main__":
+    print(pregunta_10())
+
