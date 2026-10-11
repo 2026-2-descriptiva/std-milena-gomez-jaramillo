@@ -1,3 +1,5 @@
+import pandas as pd
+
 def pregunta_12():
     """
     En `data/tbl2.tsv`, cada valor de la columna `c0` aparece en varias
@@ -14,5 +16,22 @@ def pregunta_12():
         2    2        ccc:6,ddd:2,ggg:5,jjj:1
         ...
     """
+    ruta = r"C:\Analitica_descriptiva\std-milena-gomez-jaramillo\LAB_02_pandas\data\tbl2.tsv"
 
-    raise NotImplementedError
+    df = pd.read_csv(ruta, sep="\t")
+
+    df["c5"] = df["c5a"] + ":" + df["c5b"].astype(str)
+
+    resultado = df.groupby("c0")["c5"].apply(
+        lambda textos: ",".join(sorted(textos))
+    )
+
+    resultado = resultado.reset_index()
+
+    resultado = resultado.sort_values("c0").reset_index(drop=True)
+
+    return resultado
+
+
+if __name__ == "__main__":
+    print(pregunta_12())
