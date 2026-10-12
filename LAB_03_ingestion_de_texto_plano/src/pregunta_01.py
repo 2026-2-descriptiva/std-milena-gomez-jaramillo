@@ -16,27 +16,27 @@ def pregunta_01():
     - `cluster`: número del clúster, como entero.
     - `cantidad_de_palabras_clave`: como entero.
     - `porcentaje_de_palabras_clave`: como número decimal; por ejemplo, el
-      texto `15,9 %` debe quedar como `15.9`.
+    texto `15,9 %` debe quedar como `15.9`.
     - `principales_palabras_clave`: todas las palabras clave del clúster en un
-      solo texto, separadas por una coma y un único espacio.
+    solo texto, separadas por una coma y un único espacio.
 
     Retorne el DataFrame.
 
     Ejemplo del formato de la respuesta (se omite la última columna):
 
-           cluster  cantidad_de_palabras_clave  porcentaje_de_palabras_clave
+        cluster  cantidad_de_palabras_clave  porcentaje_de_palabras_clave
         0        1                         105                          15.9
         1        2                         102                          15.4
         ...
     """
-    # 1. Localizar el archivo de datos
+    # 1 localaizar el archivo de datos
     ruta = (
         Path(__file__).resolve().parents[1]
         / "data"
         / "clusters_report.txt"
     )
 
-    # 2. Leer el reporte como texto
+    # 2 leer el reporte como texto
     texto = ruta.read_text(encoding="utf-8")
 
     # 3. Identificar el comienzo de cada clúster
@@ -47,7 +47,7 @@ def pregunta_01():
     registros = []
     registro_actual = None
 
-    # 4. Recorrer el reporte línea por línea
+    # 4 recorrer el reporte línea por línea
     for linea in texto.splitlines():
 
         coincidencia = patron.match(linea)
@@ -80,11 +80,11 @@ def pregunta_01():
                     linea.strip()
                 )
 
-    # 5. Guardar el último clúster
+    # 5 guardar el último clúster
     if registro_actual is not None:
         registros.append(registro_actual)
 
-    # 6. Limpiar y consolidar las palabras clave
+    # 6 limpiar y consolidar las palabras clave
     for registro in registros:
 
         texto_palabras = " ".join(
@@ -107,7 +107,7 @@ def pregunta_01():
 
         del registro["fragmentos"]
 
-    # 7. Construir el DataFrame
+    # 7 construir el DataFrame
     resultado = pd.DataFrame(
         registros,
         columns=[
