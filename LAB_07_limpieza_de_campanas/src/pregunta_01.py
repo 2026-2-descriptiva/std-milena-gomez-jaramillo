@@ -1,4 +1,6 @@
+from pathlib import Path
 import pandas as pd
+
 
 
 def clean_campaign_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -42,5 +44,149 @@ def clean_campaign_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         0,1,261,...,2022-05-13
         ...
     """
+    # 1. Definir las rutas
+    laboratorio = Path(__file__).resolve().parents[1]
+    carpeta_datos = laboratorio / "data"
+    carpeta_salida = laboratorio / "submission"
 
-    raise NotImplementedError
+    carpeta_salida.mkdir(parents=True, exist_ok=True)
+
+    # 2. Buscar y ordenar los archivos comprimidos
+    archivos = sorted(
+        carpeta_datos.glob("bank-marketing-campaing-*.csv.gz")
+    )
+
+    if len(archivos) != 10:
+        raise ValueError(
+            f"Se esperaban 10 archivos y se encontraron {len(archivos)}"
+        )
+
+    # 3. Leer y concatenar los archivos
+    tablas = []
+
+    for archivo in archivos:
+        tabla = pd.read_csv(
+            archivo,
+            compression="gzip"
+        )
+        tablas.append(tabla)
+
+    df = pd.concat(
+        tablas,
+        ignore_index=True
+    )
+
+    print("Registros originales:", len(df))
+
+    # 4. Construir la tabla de clientes
+    client = df[
+        [
+            "client_id",
+            "age",
+            "job",
+            "marital",
+            "education",
+            "credit_default",
+            "mortgage"
+        ]
+    ].copy()
+
+    # Normalizar ocupación
+    client["job"] = (
+        client["job"]
+        .str.replace(".", "", regex=False)
+        .str.replace("-", "_", regex=False)
+    )
+
+    # Normalizar educación
+    client["education"] = (
+        client["education"]
+        .str.replace(".", "_", regex=False)
+        .replace("unknown", pd.NA)
+    )
+
+    # Convertir variables binarias
+    client["credit_default"] = (
+        client["credit_default"] == "yes"
+    ).astype(int)
+
+    client["mortgage"] = (
+        client["mortgage"] == "yes"
+    ).astype(int)
+
+    # 5. Construir la tabla de campañas
+    campaign = df[
+        [
+            "client_id",
+            "number_contacts",
+            "contact_duration",
+            "previous_campaign_contacts",
+            "previous_outcome",
+            "campaign_outcome",
+            "month",
+            "day"
+        ]
+    ].copy()
+
+    campaign["previous_outcome"] = (
+        campaign["previous_outcome"] == "success"
+    ).astype(int)
+
+    campaign["campaign_outcome"] = (
+        campaign["campaign_outcome"] == "yes"
+    ).astype(int)
+
+    # Construir fecha de último contacto
+    fechas = (
+        campaign["day"].astype(str)
+        + "-"
+        + campaign["month"].astype(str)
+        + "-2022"
+    )
+
+    campaign["last_contact_date"] = pd.to_datetime(
+        fechas,
+        format="%d-%b-%Y"
+    ).dt.strftime("%Y-%m-%d")
+
+    # Eliminar columnas auxiliares
+    campaign = campaign.drop(
+        columns=["month", "day"]
+    )
+
+    # 6. Construir la tabla económica
+    economics = df[
+        [
+            "client_id",
+            "cons_price_idx",
+            "euribor_three_months"
+        ]
+    ].copy()
+
+    # 7. Exportar las tres tablas
+    client.to_csv(
+        carpeta_salida / "client.csv",
+        index=False
+    )
+
+    campaign.to_csv(
+        carpeta_salida / "campaign.csv",
+        index=False
+    )
+
+    economics.to_csv(
+        carpeta_salida / "economics.csv",
+        index=False
+    )
+
+    # 8. Mostrar resultados
+    print("Clientes:", client.shape)
+    print("Campañas:", campaign.shape)
+    print("Economía:", economics.shape)
+
+    return client, campaign, economics
+
+
+if __name__ == "__main__":
+    clean_campaign_data()
+

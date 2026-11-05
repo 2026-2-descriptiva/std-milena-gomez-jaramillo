@@ -1,5 +1,5 @@
+from pathlib import Path
 import pandas as pd
-
 
 def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -50,4 +50,195 @@ def pregunta_01() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         ...
     """
 
-    raise NotImplementedError
+
+    # 1. Definir rutas
+    laboratorio = Path(__file__).resolve().parents[1]
+
+    ruta_entrada = (
+        laboratorio / "data" / "superstore_orders.csv.gz"
+    )
+
+    carpeta_salida = laboratorio / "submission"
+    carpeta_salida.mkdir(parents=True, exist_ok=True)
+
+    # 2. Leer el archivo comprimido
+    df = pd.read_csv(
+        ruta_entrada,
+        sep=";",
+        decimal=",",
+        compression="gzip"
+    )
+
+    # 3. Crear variables auxiliares
+    df["is_loss"] = df["Profit"] < 0
+
+    df["loss_amount"] = (
+        df["Profit"].where(df["Profit"] < 0, 0) * -1
+    )
+
+    # 4. Resumen global de rentabilidad
+    total_sales = df["Sales"].sum()
+    total_profit = df["Profit"].sum()
+
+    profitability_summary = pd.DataFrame([
+        {
+            "lines": len(df),
+            "orders": df["Order ID"].nunique(),
+            "sales": total_sales,
+            "profit": total_profit,
+            "profit_margin": round(
+                total_profit / total_sales, 4
+            ),
+            "loss_lines": int(df["is_loss"].sum()),
+            "loss_line_rate": round(
+                df["is_loss"].mean(), 4
+            ),
+            "lost_profit": df["loss_amount"].sum()
+        }
+    ])
+
+    # 5. Clasificar los descuentos
+    def clasificar_descuento(valor):
+        if valor == 0:
+            return "0%"
+        elif 0 < valor <= 0.05:
+            return "1%-5%"
+        elif 0.05 < valor <= 0.10:
+            return "6%-10%"
+        else:
+            return "más de 10%"
+
+    df["discount_band"] = (
+        df["Discount"].apply(clasificar_descuento)
+    )
+
+    orden_descuentos = [
+        "0%",
+        "1%-5%",
+        "6%-10%",
+        "más de 10%"
+    ]
+
+    # 6. Resumen por rango de descuento
+    discount_summary = (
+        df.groupby("discount_band")
+        .agg(
+            lines=("Profit", "size"),
+            sales=("Sales", "sum"),
+            profit=("Profit", "sum"),
+            loss_line_rate=("is_loss", "mean"),
+            lost_profit=("loss_amount", "sum")
+        )
+        .reindex(orden_descuentos)
+        .reset_index()
+    )
+
+    discount_summary["profit_margin"] = (
+        discount_summary["profit"]
+        / discount_summary["sales"]
+    )
+
+    discount_summary["profit_margin"] = (
+        discount_summary["profit_margin"].round(4)
+    )
+
+    discount_summary["loss_line_rate"] = (
+        discount_summary["loss_line_rate"].round(4)
+    )
+
+    discount_summary = discount_summary[
+        [
+            "discount_band",
+            "lines",
+            "sales",
+            "profit",
+            "profit_margin",
+            "loss_line_rate",
+            "lost_profit"
+        ]
+    ]
+
+    # 7. Analizar segmentos y categorías
+    priority_segments = (
+        df.groupby(
+            ["Customer Segment", "Product Category"]
+        )
+        .agg(
+            lines=("Profit", "size"),
+            sales=("Sales", "sum"),
+            profit=("Profit", "sum"),
+            lost_profit=("loss_amount", "sum")
+        )
+        .reset_index()
+    )
+
+    # Considerar solamente grupos con 100 o más líneas
+    priority_segments = priority_segments[
+        priority_segments["lines"] >= 100
+    ].copy()
+
+    # 8. Calcular margen por segmento
+    priority_segments["profit_margin"] = (
+        priority_segments["profit"]
+        / priority_segments["sales"]
+    ).round(4)
+
+    # 9. Ordenar por pérdidas y seleccionar los primeros 5
+    priority_segments = (
+        priority_segments
+        .sort_values(
+            "lost_profit",
+            ascending=False
+        )
+        .head(5)
+        .reset_index(drop=True)
+    )
+
+    priority_segments = priority_segments[
+        [
+            "Customer Segment",
+            "Product Category",
+            "lines",
+            "sales",
+            "profit",
+            "profit_margin",
+            "lost_profit"
+        ]
+    ]
+
+    # 10. Exportar los tres archivos
+    profitability_summary.to_csv(
+        carpeta_salida / "profitability_summary.csv",
+        index=False
+    )
+
+    discount_summary.to_csv(
+        carpeta_salida / "discount_summary.csv",
+        index=False
+    )
+
+    priority_segments.to_csv(
+        carpeta_salida / "priority_segments.csv",
+        index=False
+    )
+
+    # 11. Mostrar resultados
+    print("\nRESUMEN GLOBAL")
+    print(profitability_summary.to_string(index=False))
+
+    print("\nDESCUENTOS")
+    print(discount_summary.to_string(index=False))
+
+    print("\nSEGMENTOS PRIORITARIOS")
+    print(priority_segments.to_string(index=False))
+
+    return (
+        profitability_summary,
+        discount_summary,
+        priority_segments
+    )
+
+
+if __name__ == "__main__":
+    pregunta_01()
+

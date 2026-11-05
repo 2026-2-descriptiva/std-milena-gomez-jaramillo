@@ -1,3 +1,8 @@
+import json
+from pathlib import Path
+import pandas as pd
+
+
 def pregunta_01():
     """
     Una aseguradora quiere publicar datos de sus afiliados para que un grupo
@@ -80,4 +85,197 @@ def pregunta_01():
         }
     """
 
-    raise NotImplementedError
+    # 1. Definir rutas
+    laboratorio = Path(__file__).resolve().parents[1]
+
+    ruta_entrada = laboratorio / "data" / "insurance.csv.gz"
+    carpeta_salida = laboratorio / "submission"
+    carpeta_salida.mkdir(parents=True, exist_ok=True)
+
+    # 2. Leer datos originales
+    df = pd.read_csv(ruta_entrada, compression="gzip")
+
+    # 3. Evaluar el anonimato original
+    identificadores_originales = [
+        "age", "sex", "bmi", "children", "region"
+    ]
+
+    tamanos_originales = (
+        df.groupby(identificadores_originales, dropna=False)
+        .size()
+    )
+
+    original_k = int(tamanos_originales.min())
+    original_unique_records = int(
+        (tamanos_originales == 1).sum()
+    )
+
+    # 4. Generalizar edad
+    df["age_group"] = pd.cut(
+        df["age"],
+        bins=[17, 29, 39, 49, 64],
+        labels=["18-29", "30-39", "40-49", "50-64"]
+    ).astype("string")
+
+    # 5. Generalizar IMC
+    df["bmi_group"] = pd.cut(
+        df["bmi"],
+        bins=[float("-inf"), 18.5, 25, 30, float("inf")],
+        labels=["bajo peso", "normal", "sobrepeso", "obesidad"],
+        right=False
+    ).astype("string")
+
+    # 6. Generalizar número de hijos
+    df["children_group"] = pd.cut(
+        df["children"],
+        bins=[-1, 0, 2, float("inf")],
+        labels=["0", "1-2", "3+"]
+    ).astype("string")
+
+    # 7. Definir esquemas
+    esquemas = {
+        "with_children": [
+            "age_group",
+            "sex",
+            "bmi_group",
+            "children_group",
+            "region"
+        ],
+        "without_children": [
+            "age_group",
+            "sex",
+            "bmi_group",
+            "region"
+        ]
+    }
+
+    resultados = {}
+    datos_publicables = {}
+
+    # 8. Evaluar cada esquema
+    for nombre, identificadores in esquemas.items():
+
+        # Tamaño de cada clase de equivalencia
+        tamanos = (
+            df.groupby(identificadores, dropna=False)
+            .size()
+        )
+
+        # Asignar a cada registro el tamaño de su clase
+        tamanos_por_fila = (
+            df.groupby(identificadores, dropna=False)["age"]
+            .transform("size")
+        )
+
+        # Publicar solo clases con al menos 5 registros
+        publicado = df.loc[
+            tamanos_por_fila >= 5
+        ].copy()
+
+        # Diversidad del atributo sensible
+        diversidad = (
+            publicado.groupby(
+                identificadores,
+                dropna=False
+            )["smoker"]
+            .nunique()
+        )
+
+        clases_sin_diversidad = diversidad[
+            diversidad == 1
+        ]
+
+        # Tamaño de las clases publicadas
+        tamanos_publicados = (
+            publicado.groupby(
+                identificadores,
+                dropna=False
+            )
+            .size()
+        )
+
+        registros_sin_diversidad = int(
+            tamanos_publicados.loc[
+                clases_sin_diversidad.index
+            ].sum()
+        )
+
+        resultados[nombre] = {
+            "quasi_identifiers": identificadores,
+            "equivalence_classes": int(len(tamanos)),
+            "k_before_suppression": int(tamanos.min()),
+            "suppressed_records": int(
+                len(df) - len(publicado)
+            ),
+            "published_records": int(len(publicado)),
+            "published_classes": int(len(tamanos_publicados)),
+            "classes_without_smoker_diversity": int(
+                len(clases_sin_diversidad)
+            ),
+            "records_without_smoker_diversity": (
+                registros_sin_diversidad
+            )
+        }
+
+        datos_publicables[nombre] = publicado
+
+    # 9. Seleccionar esquema con menos supresiones
+    esquema_seleccionado = min(
+        resultados,
+        key=lambda nombre: resultados[nombre][
+            "suppressed_records"
+        ]
+    )
+
+    publicado = datos_publicables[esquema_seleccionado]
+
+    # 10. Calcular indicadores de utilidad
+    reporte = {
+        "original_k": original_k,
+        "original_unique_records": original_unique_records,
+        "schemes": resultados,
+        "selected_scheme": esquema_seleccionado,
+        "mean_charges_original": float(
+            df["charges"].mean()
+        ),
+        "mean_charges_published": float(
+            publicado["charges"].mean()
+        ),
+        "smoker_rate_original": float(
+            df["smoker"].eq("yes").mean()
+        ),
+        "smoker_rate_published": float(
+            publicado["smoker"].eq("yes").mean()
+        )
+    }
+
+    # 11. Guardar reporte JSON
+    ruta_reporte = carpeta_salida / "privacy_report.json"
+
+    with open(ruta_reporte, "w", encoding="utf-8") as archivo:
+        json.dump(
+            reporte,
+            archivo,
+            indent=4,
+            ensure_ascii=False
+        )
+
+    # 12. Guardar datos publicables
+    columnas_publicadas = (
+        esquemas[esquema_seleccionado]
+        + ["smoker", "charges"]
+    )
+
+    publicado[columnas_publicadas].to_csv(
+        carpeta_salida / "insurance_published.csv",
+        index=False,
+        encoding="utf-8"
+    )
+
+    print(json.dumps(reporte, indent=4, ensure_ascii=False))
+
+    return reporte
+
+
+if __name__ == "__main__":
+    pregunta_01()
