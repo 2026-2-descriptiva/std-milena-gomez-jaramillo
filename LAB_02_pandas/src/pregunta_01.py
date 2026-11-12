@@ -1,6 +1,7 @@
 # comentario de prueba
 
 import pandas as pd
+from pathlib import Path
 
 def pregunta_01():
     """
@@ -11,7 +12,7 @@ def pregunta_01():
 
         40
     """
-    ruta = r"C:\Analitica_descriptiva\std-milena-gomez-jaramillo\LAB_02_pandas\data\tbl0.tsv"
+    ruta = Path(__file__).resolve().parent.parent / "data" / "tbl0.tsv"
 
     df = pd.read_csv(ruta, sep="\t")
 
