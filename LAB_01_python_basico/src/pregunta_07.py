@@ -1,6 +1,7 @@
 # comentario de prueba
 
 import gzip
+from pathlib import Path
 
 def pregunta_07():
     """
@@ -16,7 +17,9 @@ def pregunta_07():
     """
     grupos = {}
 
-    with gzip.open("C:\\Analitica_descriptiva\\std-milena-gomez-jaramillo\\LAB_01_python_basico\\data\\data.csv.gz", "rt", encoding="utf-8") as archivo:
+    ruta = Path(__file__).resolve().parent.parent / "data" / "data.csv.gz"
+
+    with gzip.open(ruta, "rt", encoding="utf-8") as archivo:
         for linea in archivo:
             columnas = linea.strip().split("\t")
 
